@@ -1,33 +1,24 @@
 package com.udacity.project4.locationreminders.reminderslist
 
-import android.content.Context
 import android.os.Bundle
-import android.view.View
-import android.view.ViewGroup
 import androidx.fragment.app.testing.launchFragmentInContainer
 import androidx.navigation.NavController
 import androidx.navigation.Navigation
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
-import androidx.test.core.app.ApplicationProvider.getApplicationContext
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.assertion.ViewAssertions
-import androidx.test.espresso.matcher.ViewMatchers
-import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.contrib.RecyclerViewActions
+import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.MediumTest
-import com.udacity.project4.FakeDataSource
+import com.udacity.project4.locationreminders.FakeDataSource
 import com.udacity.project4.R
 import com.udacity.project4.locationreminders.data.dto.ReminderDTO
-import com.udacity.project4.locationreminders.data.dto.Result
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runBlockingTest
-import org.hamcrest.Description
-import org.hamcrest.Matcher
-import org.hamcrest.Matchers
-import org.hamcrest.TypeSafeMatcher
-import org.junit.Assert.*
+import org.hamcrest.CoreMatchers.not
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,122 +34,85 @@ import org.mockito.Mockito.verify
 @MediumTest
 class ReminderListFragmentTest {
 
-//    TODO: test the navigation of the fragments.
-//    TODO: test the displayed data on the UI.
-//    TODO: add testing for the error messages.
-
-    private lateinit var fakeDataSource: FakeDataSource
-    private lateinit var reminderListViewModel: RemindersListViewModel
+    private lateinit var dataSource: FakeDataSource
+    private lateinit var remindersListViewModel: RemindersListViewModel
 
     @Before
-    fun setup() {
-        fakeDataSource = FakeDataSource()
-        reminderListViewModel =
-            RemindersListViewModel(ApplicationProvider.getApplicationContext(), fakeDataSource)
+    fun init() {
+        dataSource = FakeDataSource()
+        remindersListViewModel =
+            RemindersListViewModel(ApplicationProvider.getApplicationContext(), dataSource)
         stopKoin()
-
         val myModule = module {
             single {
-                reminderListViewModel
+                remindersListViewModel
             }
         }
-        // new koin module
         startKoin {
             modules(listOf(myModule))
         }
     }
 
     @Test
-    fun displayRemindersList() = runBlockingTest {
+    fun clickOnAddReminderButton_navigateToAddReminderFragment() {
 
-        val list = listOf<ReminderDTO>(
-            ReminderDTO("title", "description", "location", (-360..360).random().toDouble(),(-360..360).random().toDouble()),
-            ReminderDTO(
-                "title",
-                "description",
-                "location",
-                (-360..360).random().toDouble(),
-                (-360..360).random().toDouble()
-            ),
-            ReminderDTO(
-                "title",
-                "description",
-                "location",
-                (-360..360).random().toDouble(),
-                (-360..360).random().toDouble()
-            ),
-            ReminderDTO(
-                "title",
-                "description",
-                "location",
-                (-360..360).random().toDouble(),
-                (-360..360).random().toDouble()
-            )
-        )
-
-        list.forEach {
-            fakeDataSource.saveReminder(it)
-        }
-
-        // GIVEN -
-        val reminders = (fakeDataSource.getReminders() as? Result.Success)?.data
-
-        val firstItem = reminders!![0]
-
-        onView(
-            Matchers.allOf(
-                withText(firstItem.location),
-                childAtPosition(
-                    childAtPosition(
-                        withId(R.id.reminderCardView),
-                        0
-                    ),
-                    2
-                ),
-                ViewMatchers.isDisplayed()
-            )
-        )
-            .check(ViewAssertions.matches(withText(firstItem.location)))
-    }
-
-    @Test
-    fun navigateToAddReminder() = runBlockingTest {
-        // WHEN - Details fragment launched to display task
+        // Given - Reminder list fragment is displayed with the fab
         val scenario = launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme)
+
         val navController = mock(NavController::class.java)
+
         scenario.onFragment {
-            Navigation.setViewNavController(it.view!!, navController)
+            Navigation.setViewNavController(it.requireView(), navController)
         }
 
+        // When - performing a click to add reminder fab
         onView(withId(R.id.addReminderFAB)).perform(click())
 
+        // Then - Check navigation to SaveReminderFragment called or not
         verify(navController).navigate(ReminderListFragmentDirections.toSaveReminder())
+
+    }
+
+
+    @Test
+    fun testTheDataDisplayed() = runBlockingTest {
+
+        // Given - on the reminder list screen with 3 reminders
+        val reminder1 =
+            ReminderDTO("testTitle1", "testDescription", "testLocation1", 120.0, 60.0, "testId1")
+        val reminder2 =
+            ReminderDTO("testTitle2", "testDescription", "testLocation2", 120.0, 60.0, "testId2")
+        val reminder3 =
+            ReminderDTO("testTitle3", "testDescription", "testLocation3", 120.0, 60.0, "testId3")
+
+        dataSource.saveReminder(reminder1)
+        dataSource.saveReminder(reminder2)
+        dataSource.saveReminder(reminder3)
+
+        // When - the fragment is opened
+        val scenario = launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme)
+
+        // Then check for existence of the three reminders on the screen
+        onView(withText(reminder1.title)).check(matches(isDisplayed()))
+        onView(withText(reminder1.location)).check(matches(isDisplayed()))
+        onView(withText(reminder2.title)).check(matches(isDisplayed()))
+        onView(withText(reminder2.location)).check(matches(isDisplayed()))
+        onView(withText(reminder3.title)).check(matches(isDisplayed()))
+        onView(withText(reminder3.location)).check(matches(isDisplayed()))
+
     }
 
     @Test
-    fun errorSnackBackShown() = runBlockingTest {
-        fakeDataSource.deleteAllReminders()
-        // WHEN - Details fragment launched to display task
-        onView(ViewMatchers.withText("No reminders found"))
-            .check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+    fun checkErrorMessage() = runBlockingTest {
+
+        // Given - The data source is returning error as result when calling getReminders
+        dataSource.setReturnError(true)
+        dataSource.getReminders()
+
+        // When - the fragment is opened
+        val scenario = launchFragmentInContainer<ReminderListFragment>(Bundle(), R.style.AppTheme)
+        Thread.sleep(1000)
+        //Then - The snack bar is shown with the returned error message in the Error Result
+        onView(withText("Test Error.")).check(matches(isDisplayed()))
     }
-
-    private fun childAtPosition(
-        parentMatcher: Matcher<View>, position: Int
-    ): Matcher<View> {
-
-        return object : TypeSafeMatcher<View>() {
-            override fun describeTo(description: Description) {
-                description.appendText("Child at position $position in parent ")
-                parentMatcher.describeTo(description)
-            }
-
-            public override fun matchesSafely(view: View): Boolean {
-                val parent = view.parent
-                return parent is ViewGroup && parentMatcher.matches(parent)
-                        && view == parent.getChildAt(position)
-            }
-        }
-    }
-
 }

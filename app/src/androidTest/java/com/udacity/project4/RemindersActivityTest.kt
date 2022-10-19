@@ -1,21 +1,39 @@
 package com.udacity.project4
 
 import android.app.Application
+import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
+import androidx.test.espresso.Espresso.*
+import androidx.test.espresso.IdlingRegistry
+import androidx.test.espresso.action.ViewActions
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.assertion.ViewAssertions
+import androidx.test.espresso.matcher.RootMatchers
+import androidx.test.espresso.matcher.ViewMatchers
+import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
+import androidx.test.rule.ActivityTestRule
+import com.udacity.project4.locationreminders.RemindersActivity
 import com.udacity.project4.locationreminders.data.ReminderDataSource
 import com.udacity.project4.locationreminders.data.local.LocalDB
 import com.udacity.project4.locationreminders.data.local.RemindersLocalRepository
 import com.udacity.project4.locationreminders.reminderslist.RemindersListViewModel
 import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
+import com.udacity.project4.util.DataBindingIdlingResource
+import com.udacity.project4.util.monitorActivity
+import com.udacity.project4.utils.EspressoIdlingResource
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import org.hamcrest.CoreMatchers
+import org.junit.After
 import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
 import org.junit.runner.RunWith
 import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
-import org.koin.core.get
 import org.koin.dsl.module
 import org.koin.test.AutoCloseKoinTest
 import org.koin.test.get
@@ -24,11 +42,14 @@ import org.koin.test.get
 @LargeTest
 //END TO END test to black box test the app
 class RemindersActivityTest :
-    AutoCloseKoinTest() {
-    // Extended Koin Test - embed autoclose @after method to close Koin after every test
+    AutoCloseKoinTest() {// Extended Koin Test - embed autoclose @after method to close Koin after every test
+
+    @get:Rule
+    var mActivityRule = ActivityTestRule<RemindersActivity>(RemindersActivity::class.java)
 
     private lateinit var repository: ReminderDataSource
     private lateinit var appContext: Application
+    private val dataBindingIdlingResource = DataBindingIdlingResource()
 
     /**
      * As we use Koin as a Service Locator Library to develop our code, we'll also use Koin to test our code.
@@ -54,13 +75,78 @@ class RemindersActivityTest :
             single { RemindersLocalRepository(get()) as ReminderDataSource }
             single { LocalDB.createRemindersDao(appContext) }
         }
+        //declare a new koin module
         startKoin {
             modules(listOf(myModule))
         }
+        //Get our real repository
         repository = get()
+
+        //clear the data to start fresh
         runBlocking {
             repository.deleteAllReminders()
         }
     }
 
+
+//    TODO: add End to End testing to the app
+
+    @Before
+    fun registerIdlingResource() {
+        IdlingRegistry.getInstance().register(EspressoIdlingResource.countingIdlingResource)
+        IdlingRegistry.getInstance().register(dataBindingIdlingResource)
+    }
+
+    @After
+    fun unRegisterIdlingResource() {
+        IdlingRegistry.getInstance().unregister(EspressoIdlingResource.countingIdlingResource)
+        IdlingRegistry.getInstance().unregister(dataBindingIdlingResource)
+    }
+
+    @Test
+    fun addNewReminder() {
+        val activityScenario = ActivityScenario.launch(RemindersActivity::class.java)
+        dataBindingIdlingResource.monitorActivity(activityScenario)
+
+        // Click on add new reminder button
+        onView(withId(R.id.addReminderFAB)).perform(click())
+
+        // Click on selectLocation to select location to add gefence
+        onView(withId(R.id.selectLocation)).perform(click())
+
+        // Long click on the screen to create dropped pin
+        onView(withId(R.id.map_fragment)).perform(click())
+
+        // Click on confirm to return to save reminder fragment with the selected location
+        onView(withId(R.id.save_location)).perform(click())
+
+        // Add title to reminder title edit text
+        onView(withId(R.id.reminderTitle)).perform(ViewActions.typeText("New Reminder"))
+
+        // Add description to description title edit text
+        onView(withId(R.id.reminderDescription)).perform(ViewActions.typeText("New Reminder Description"))
+
+        // Press back to close keyboard
+        pressBack()
+
+        // Click on save reminder button to save it
+        onView(withId(R.id.saveReminder)).perform(click())
+
+        // Check that the new reminder is saved and displayed
+        onView(ViewMatchers.withText("New Reminder")).check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+
+//        onView(ViewMatchers.withText(R.string.reminder_saved)).inRoot(
+//            RootMatchers.withDecorView(
+//                CoreMatchers.not(
+//                    CoreMatchers.`is`(
+//                        mActivityRule.activity.window.decorView
+//                    )
+//                )
+//            )
+//        ).check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+
+
+        activityScenario.close()
+
+    }
 }

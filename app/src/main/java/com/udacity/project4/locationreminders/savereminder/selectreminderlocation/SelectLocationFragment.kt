@@ -2,23 +2,33 @@ package com.udacity.project4.locationreminders.savereminder.selectreminderlocati
 
 
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.app.Activity
+import android.content.ContentValues.TAG
+import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.view.*
 import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.databinding.DataBindingUtil
+import com.google.android.gms.common.api.ResolvableApiException
+import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
+import com.google.android.material.snackbar.Snackbar
 import com.udacity.project4.R
 import com.udacity.project4.base.BaseFragment
 import com.udacity.project4.base.NavigationCommand
 import com.udacity.project4.databinding.FragmentSelectLocationBinding
+import com.udacity.project4.locationreminders.savereminder.REQUEST_TURN_DEVICE_LOCATION_ON
 import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
 import com.udacity.project4.utils.setDisplayHomeAsUpEnabled
 import org.koin.android.ext.android.inject
@@ -65,8 +75,11 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
 
         binding.saveLocation.setOnClickListener {
-            onLocationSelected()
-            it.isVisible = false
+            if (::pointOfInterest.isInitialized){
+                onLocationSelected()
+            }else{
+                _viewModel.showSnackBar.value = getString(R.string.select_poi)
+            }
         }
         return binding.root
     }
@@ -116,7 +129,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
     override fun onMapReady(p0: GoogleMap) {
         mMap = p0
-        enableMyLocation()
+        checkDeviceLocationSettingsAndEnableMyLocation()
         mMap.setMapStyle(
             MapStyleOptions.loadRawResourceStyle(
                 requireActivity(),
@@ -126,7 +139,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
         mMap.setOnPoiClickListener {
             pointOfInterest = it
-            binding.saveLocation.isVisible = true
             mMap.clear()
 
             val snippet = String.format(
@@ -152,7 +164,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         }
 
         mMap.setOnMapClickListener {
-            binding.saveLocation.isVisible = true
 
             val snippet = String.format(
                 Locale.getDefault(),
@@ -202,6 +213,64 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
             }
 
         }
+
+    private fun checkDeviceLocationSettingsAndEnableMyLocation(){
+        val locationRequest = LocationRequest.create().apply {
+            priority = LocationRequest.PRIORITY_LOW_POWER
+        }
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+
+        val settingsClient = LocationServices.getSettingsClient(requireActivity())
+        val locationSettingsResponseTask =
+            settingsClient.checkLocationSettings(builder.build())
+
+        locationSettingsResponseTask.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException){
+                try {
+                    startIntentSenderForResult(
+                        exception.resolution.intentSender,
+                        REQUEST_TURN_DEVICE_LOCATION_ON,
+                        null,
+                        0,
+                        0,
+                        0,
+                        null
+                    )
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    Log.d(
+                        TAG, "Error getting location settings resolution: " + sendEx.message
+                    )
+                }
+            } else {
+                Snackbar.make(
+                    binding.selectLoactionLayout,
+                    R.string.location_required_error, Snackbar.LENGTH_INDEFINITE
+                ).setAction(android.R.string.ok) {
+                    checkDeviceLocationSettingsAndEnableMyLocation()
+                }.show()
+            }
+        }
+        locationSettingsResponseTask.addOnCompleteListener {
+            if ( it.isSuccessful ) {
+                enableMyLocation()
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_TURN_DEVICE_LOCATION_ON) {
+            if (resultCode == Activity.RESULT_OK) {
+                checkDeviceLocationSettingsAndEnableMyLocation()
+            } else {
+                Snackbar.make(
+                    binding.selectLoactionLayout,
+                    R.string.location_required_error, Snackbar.LENGTH_INDEFINITE
+                ).setAction(android.R.string.ok) {
+                }.show()
+            }
+        }
+    }
 
 }
 
