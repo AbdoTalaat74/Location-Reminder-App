@@ -21,8 +21,6 @@ import androidx.core.app.ActivityCompat
 import androidx.databinding.DataBindingUtil
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
-import com.google.android.gms.location.Geofence.GEOFENCE_TRANSITION_ENTER
-import com.google.android.gms.location.Geofence.NEVER_EXPIRE
 import com.google.android.material.snackbar.Snackbar
 import com.udacity.project4.BuildConfig
 import com.udacity.project4.R
@@ -44,11 +42,7 @@ class SaveReminderFragment : BaseFragment() {
     private lateinit var geofencingClient: GeofencingClient
     private lateinit var reminderDataItem:ReminderDataItem
 
-    private val pendingIntent: PendingIntent by lazy {
-        val intent = Intent(requireContext(), GeofenceBroadcastReceiver::class.java)
-        intent.action = ACTION_GEOFENCE_EVENT
-        PendingIntent.getBroadcast(requireContext(), 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-    }
+
 
     private val runningQOrLater =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
@@ -89,7 +83,7 @@ class SaveReminderFragment : BaseFragment() {
 //             1) add a geofencing request
 //             2) save the reminder to the local db
 
-             reminderDataItem =
+            reminderDataItem =
                 ReminderDataItem(title, description, location, latitude, longitude)
 
             if (_viewModel.validateEnteredData(reminderDataItem)) {
@@ -276,4 +270,3 @@ private const val REQUEST_TURN_DEVICE_LOCATION_ON = 29
 private const val TAG = "SaveReminderFragment"
 private const val LOCATION_PERMISSION_INDEX = 0
 private var BACKGROUND_LOCATION_PERMISSION_INDEX = 1
-

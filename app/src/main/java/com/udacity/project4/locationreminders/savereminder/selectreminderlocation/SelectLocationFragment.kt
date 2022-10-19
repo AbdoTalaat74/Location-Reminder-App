@@ -1,15 +1,11 @@
 package com.udacity.project4.locationreminders.savereminder.selectreminderlocation
 
 
-import android.Manifest.permission.ACCESS_BACKGROUND_LOCATION
 import android.Manifest.permission.ACCESS_FINE_LOCATION
-import android.annotation.TargetApi
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.view.*
-import androidx.core.app.ActivityCompat
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.databinding.DataBindingUtil
@@ -27,6 +23,7 @@ import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
 import com.udacity.project4.utils.setDisplayHomeAsUpEnabled
 import org.koin.android.ext.android.inject
 import java.util.*
+import kotlin.properties.Delegates
 
 
 class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
@@ -37,11 +34,11 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     private lateinit var mMap: GoogleMap
     private lateinit var supportMapFragment: SupportMapFragment
     private lateinit var pointOfInterest: PointOfInterest
+    private var PoiSelected by Delegates.notNull<Boolean>()
     private val client by lazy { LocationServices.getFusedLocationProviderClient(requireActivity()) }
-    private val runningQOrLater = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
-    ): View? {
+    ): View {
         binding =
             DataBindingUtil.inflate(inflater, R.layout.fragment_select_location, container, false)
 
@@ -81,11 +78,12 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         //         and navigate back to the previous fragment to save the reminder and add the geofence
 
 
-
+        _viewModel.selectedPOI.value = pointOfInterest
+        _viewModel.reminderSelectedLocationStr.value = pointOfInterest.name
         _viewModel.latitude.value = pointOfInterest.latLng.latitude
         _viewModel.longitude.value = pointOfInterest.latLng.longitude
-        _viewModel.reminderSelectedLocationStr.value = pointOfInterest.name
         _viewModel.navigationCommand.value = NavigationCommand.Back
+
     }
 
 
@@ -96,7 +94,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     override fun onOptionsItemSelected(item: MenuItem) = when (item.itemId) {
 
         // TODO: Change the map type based on the user's selection.
-
 
         R.id.normal_map -> {
             mMap.mapType = GoogleMap.MAP_TYPE_NORMAL
@@ -128,7 +125,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         )
 
         mMap.setOnPoiClickListener {
-            this.pointOfInterest = it
+            pointOfInterest = it
             binding.saveLocation.isVisible = true
             mMap.clear()
 
@@ -154,52 +151,57 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
         }
 
+        mMap.setOnMapClickListener {
+            binding.saveLocation.isVisible = true
+
+            val snippet = String.format(
+                Locale.getDefault(),
+                "Lat: %1$.5f, Long: %2$.5f",
+                it.latitude,
+                it.longitude
+            )
+
+            mMap.clear()
+            val marker =
+                MarkerOptions().position(it).title(getString(R.string.dropped_pin)).snippet(snippet)
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_CYAN))
+            mMap.addMarker(marker)
+
+            pointOfInterest = PointOfInterest(it, marker.title.toString(), marker.title.toString())
+        }
 
     }
-    @TargetApi(Build.VERSION_CODES.Q)
+
+
     private fun enableMyLocation() {
-        if (ContextCompat.checkSelfPermission(
-                requireActivity(),
-                ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
+        when (ContextCompat.checkSelfPermission(requireActivity(), ACCESS_FINE_LOCATION)) {
+            PackageManager.PERMISSION_GRANTED -> {
+                mMap.isMyLocationEnabled = true
+                client.lastLocation.addOnSuccessListener {
+                    it?.let {
+                        val latLang = LatLng(it.latitude, it.longitude)
 
-        ) {
-            mMap.isMyLocationEnabled = true
-            client.lastLocation.addOnSuccessListener {
-                it?.let {
-                    val latLang = LatLng(it.latitude, it.longitude)
-
-                    mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLang, 15f))
+                        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLang, 15f))
+                    }
                 }
             }
-
-
-        } else {
-            Log.e("SelectLocationFragment","Error Location")
-            ActivityCompat.requestPermissions(
-                requireActivity(),
-                arrayOf(ACCESS_FINE_LOCATION),
-                REQUEST_LOCATION_PERMISSION
-            )
-        }
-    }
-
-    companion object {
-        const val REQUEST_LOCATION_PERMISSION = 1
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_LOCATION_PERMISSION) {
-            if (grantResults.isNotEmpty() && (grantResults[0] == PackageManager.PERMISSION_GRANTED)) {
-                enableMyLocation()
+            else -> {
+                requestPermissionLauncher.launch(ACCESS_FINE_LOCATION)
             }
         }
     }
 
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(RequestPermission()) { isGranted ->
+            if (isGranted) {
+                _viewModel.showSnackBar.value = "Permission granted"
+                enableMyLocation()
+            } else {
+                _viewModel.showSnackBar.value = "Permission denied"
+            }
+
+        }
+
 }
+
