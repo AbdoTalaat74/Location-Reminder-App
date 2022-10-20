@@ -2,15 +2,15 @@ package com.udacity.project4
 
 import android.app.Application
 import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.core.app.ApplicationProvider.getApplicationContext
-import androidx.test.espresso.Espresso.*
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.Espresso.pressBack
 import androidx.test.espresso.IdlingRegistry
-import androidx.test.espresso.action.ViewActions
-import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.assertion.ViewAssertions
-import androidx.test.espresso.matcher.RootMatchers
-import androidx.test.espresso.matcher.ViewMatchers
-import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.espresso.action.ViewActions.*
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.RootMatchers.withDecorView
+import androidx.test.espresso.matcher.ViewMatchers.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import androidx.test.rule.ActivityTestRule
@@ -21,11 +21,12 @@ import com.udacity.project4.locationreminders.data.local.RemindersLocalRepositor
 import com.udacity.project4.locationreminders.reminderslist.RemindersListViewModel
 import com.udacity.project4.locationreminders.savereminder.SaveReminderViewModel
 import com.udacity.project4.util.DataBindingIdlingResource
+import com.udacity.project4.util.ToastMatcher
 import com.udacity.project4.util.monitorActivity
 import com.udacity.project4.utils.EspressoIdlingResource
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import org.hamcrest.CoreMatchers
+import org.hamcrest.CoreMatchers.`is`
+import org.hamcrest.CoreMatchers.not
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -111,40 +112,33 @@ class RemindersActivityTest :
         // Click on add new reminder button
         onView(withId(R.id.addReminderFAB)).perform(click())
 
-        // Click on selectLocation to select location to add gefence
         onView(withId(R.id.selectLocation)).perform(click())
 
-        // Long click on the screen to create dropped pin
         onView(withId(R.id.map_fragment)).perform(click())
 
-        // Click on confirm to return to save reminder fragment with the selected location
         onView(withId(R.id.save_location)).perform(click())
 
-        // Add title to reminder title edit text
-        onView(withId(R.id.reminderTitle)).perform(ViewActions.typeText("New Reminder"))
+        onView(withId(R.id.reminderTitle)).perform(typeText("New Reminder"))
 
-        // Add description to description title edit text
-        onView(withId(R.id.reminderDescription)).perform(ViewActions.typeText("New Reminder Description"))
+        onView(withId(R.id.reminderDescription)).perform(typeText("New Reminder Description"))
 
-        // Press back to close keyboard
         pressBack()
 
-        // Click on save reminder button to save it
         onView(withId(R.id.saveReminder)).perform(click())
 
-        // Check that the new reminder is saved and displayed
-        onView(ViewMatchers.withText("New Reminder")).check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        onView(withText("New Reminder")).check(matches(isDisplayed()))
 
-//        onView(ViewMatchers.withText(R.string.reminder_saved)).inRoot(
-//            RootMatchers.withDecorView(
-//                CoreMatchers.not(
-//                    CoreMatchers.`is`(
-//                        mActivityRule.activity.window.decorView
-//                    )
-//                )
-//            )
-//        ).check(ViewAssertions.matches(ViewMatchers.isDisplayed()))
+        onView(withText(R.string.reminder_saved)).inRoot(
+            withDecorView(
+                not(
+                    `is`(
+                        mActivityRule.activity.window.decorView
+                    )
+                )
+            )
+        ).check(matches(isDisplayed()))
 
+//    onView(withText(R.string.reminder_saved)).inRoot(ToastMatcher()).check(matches(isDisplayed()))
 
         activityScenario.close()
 
