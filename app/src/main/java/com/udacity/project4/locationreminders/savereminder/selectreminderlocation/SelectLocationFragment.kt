@@ -20,6 +20,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.LocationSettingsRequest
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.GoogleMap.OnMyLocationButtonClickListener
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.*
@@ -129,7 +130,21 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
     override fun onMapReady(p0: GoogleMap) {
         mMap = p0
-        checkDeviceLocationSettingsAndEnableMyLocation()
+        when (ContextCompat.checkSelfPermission(requireActivity(), ACCESS_FINE_LOCATION)) {
+            PackageManager.PERMISSION_GRANTED -> {
+                mMap.isMyLocationEnabled = true
+
+            }
+            else -> {
+                requestPermissionLauncher.launch(ACCESS_FINE_LOCATION)
+            }
+        }
+
+        mMap.setOnMyLocationButtonClickListener {
+            checkDeviceLocationSettingsAndEnableMyLocation()
+            true
+        }
+
         mMap.setMapStyle(
             MapStyleOptions.loadRawResourceStyle(
                 requireActivity(),
@@ -187,11 +202,10 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     private fun enableMyLocation() {
         when (ContextCompat.checkSelfPermission(requireActivity(), ACCESS_FINE_LOCATION)) {
             PackageManager.PERMISSION_GRANTED -> {
-                mMap.isMyLocationEnabled = true
+
                 client.lastLocation.addOnSuccessListener {
                     it?.let {
                         val latLang = LatLng(it.latitude, it.longitude)
-
                         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(latLang, 15f))
                     }
                 }
@@ -224,6 +238,17 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         val locationSettingsResponseTask =
             settingsClient.checkLocationSettings(builder.build())
 
+
+        locationSettingsResponseTask.addOnSuccessListener {
+            enableMyLocation()
+        }
+
+        locationSettingsResponseTask.addOnCompleteListener {
+            if ( it.isSuccessful ) {
+                enableMyLocation()
+            }
+        }
+
         locationSettingsResponseTask.addOnFailureListener { exception ->
             if (exception is ResolvableApiException){
                 try {
@@ -250,11 +275,7 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
                 }.show()
             }
         }
-        locationSettingsResponseTask.addOnCompleteListener {
-            if ( it.isSuccessful ) {
-                enableMyLocation()
-            }
-        }
+
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
