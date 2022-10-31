@@ -2,6 +2,7 @@ package com.udacity.project4.locationreminders.savereminder.selectreminderlocati
 
 
 import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ContentValues.TAG
 import android.content.Intent
@@ -76,9 +77,9 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
 
 
         binding.saveLocation.setOnClickListener {
-            if (::pointOfInterest.isInitialized){
+            if (::pointOfInterest.isInitialized) {
                 onLocationSelected()
-            }else{
+            } else {
                 _viewModel.showSnackBar.value = getString(R.string.select_poi)
             }
         }
@@ -133,7 +134,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
         when (ContextCompat.checkSelfPermission(requireActivity(), ACCESS_FINE_LOCATION)) {
             PackageManager.PERMISSION_GRANTED -> {
                 mMap.isMyLocationEnabled = true
-
             }
             else -> {
                 requestPermissionLauncher.launch(ACCESS_FINE_LOCATION)
@@ -217,18 +217,19 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     }
 
 
+    @SuppressLint("MissingPermission")
     private val requestPermissionLauncher =
         registerForActivityResult(RequestPermission()) { isGranted ->
             if (isGranted) {
                 _viewModel.showSnackBar.value = "Permission granted"
-                enableMyLocation()
+                mMap.isMyLocationEnabled = true
             } else {
                 _viewModel.showSnackBar.value = "Permission denied"
             }
 
         }
 
-    private fun checkDeviceLocationSettingsAndEnableMyLocation(){
+    private fun checkDeviceLocationSettingsAndEnableMyLocation() {
         val locationRequest = LocationRequest.create().apply {
             priority = LocationRequest.PRIORITY_LOW_POWER
         }
@@ -239,18 +240,16 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
             settingsClient.checkLocationSettings(builder.build())
 
 
-        locationSettingsResponseTask.addOnSuccessListener {
-            enableMyLocation()
-        }
+
 
         locationSettingsResponseTask.addOnCompleteListener {
-            if ( it.isSuccessful ) {
+            if (it.isSuccessful) {
                 enableMyLocation()
             }
         }
 
         locationSettingsResponseTask.addOnFailureListener { exception ->
-            if (exception is ResolvableApiException){
+            if (exception is ResolvableApiException) {
                 try {
                     startIntentSenderForResult(
                         exception.resolution.intentSender,
