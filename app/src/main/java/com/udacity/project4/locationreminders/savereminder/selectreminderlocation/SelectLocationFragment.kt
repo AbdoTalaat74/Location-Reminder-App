@@ -43,7 +43,6 @@ class SelectLocationFragment : BaseFragment(), OnMapReadyCallback {
     private lateinit var mMap: GoogleMap
     private lateinit var supportMapFragment: SupportMapFragment
     private lateinit var pointOfInterest: PointOfInterest
-    private var PoiSelected by Delegates.notNull<Boolean>()
     private val client by lazy { LocationServices.getFusedLocationProviderClient(requireActivity()) }
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
